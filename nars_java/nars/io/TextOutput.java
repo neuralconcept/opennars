@@ -27,7 +27,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Arrays;
-import nars.core.Events.Solved;
+import nars.core.Events.Answer;
 import nars.core.NAR;
 import nars.entity.Concept;
 import nars.entity.Sentence;
@@ -205,7 +205,7 @@ public class TextOutput extends Output {
             }      
             
         }        
-        else if ((channel == OUT.class) || (channel == IN.class) || (channel == ECHO.class) || (channel == EXE.class) || (channel == Solved.class))  {
+        else if ((channel == OUT.class) || (channel == IN.class) || (channel == ECHO.class) || (channel == EXE.class) || (channel == Answer.class))  {
 
 
 
@@ -283,7 +283,7 @@ public class TextOutput extends Output {
             buffer.append(s.toString(nar, showStamp));                        
         }                    
         else if (signal instanceof Object[]) {
-            if (channel == Solved.class) {
+            if (channel == Answer.class) {
                 Object[] o = (Object[])signal;
                 Task task = (Task)o[0];
                 Sentence belief = (Sentence)o[1];
@@ -291,7 +291,7 @@ public class TextOutput extends Output {
                 Sentence question = task.sentence;
                 Sentence answer = belief;
                 
-                buffer.append(answer.toString(nar, false));
+                buffer.append(answer.toString(nar, showStamp));
             }
             else            
                 buffer.append( Arrays.toString((Object[])signal) );

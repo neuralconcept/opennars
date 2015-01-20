@@ -1,10 +1,10 @@
 package nars.grid2d;
 
 import java.util.List;
+import nars.core.Build;
 import nars.core.EventEmitter.EventObserver;
 import nars.core.Events;
 import nars.core.NAR;
-import nars.core.Build;
 import nars.core.Parameters;
 import nars.core.build.Default;
 import nars.grid2d.Cell.Logic;
@@ -20,6 +20,9 @@ import nars.grid2d.operator.Deactivate;
 import nars.grid2d.operator.Goto;
 import nars.grid2d.operator.Pick;
 import nars.gui.NARSwing;
+import nars.plugin.app.plan.TemporalParticlePlanner;
+import nars.plugin.mental.FullInternalExperience;
+import nars.plugin.mental.InternalExperience;
 import processing.core.PVector;
 
 public class TestChamber {
@@ -44,14 +47,23 @@ public class TestChamber {
         Parameters.DEFAULT_JUDGMENT_DURABILITY=0.99f; //try to don't forget the input in TestChamber domain
         NAR nar = builder.build();
         //set NAR runtime parmeters:  
-                                    //because there every intermediate step matters a lot
+
+        for(NAR.PluginState pluginstate : nar.getPlugins()) {
+            if(pluginstate.plugin instanceof InternalExperience || pluginstate.plugin instanceof FullInternalExperience) {
+                nar.removePlugin(pluginstate);
+            }
+        }
+  
+        nar.addPlugin(new TemporalParticlePlanner());
+        
         //(nar.param).duration.set(10);
         (nar.param).noiseLevel.set(0); 
         new NARSwing(nar);
 
         new TestChamber(nar);
                 
-        nar.start(narUpdatePeriod);        
+        nar.start(narUpdatePeriod);   
+        
     }
 
     
@@ -255,8 +267,8 @@ public class TestChamber {
                                         inventorybag=(LocalGridObject)obi;
                                         if(obi!=null) {
                                             space.objects.remove(obi);
-                                            if(inventorybag.doorname.startsWith("key")) {
-                                                keyn=Integer.parseInt(inventorybag.doorname.replaceAll("key", ""));
+                                            if(inventorybag.doorname.startsWith("{key")) {
+                                                keyn=Integer.parseInt(inventorybag.doorname.replaceAll("key", "").replace("}", "").replace("{", ""));
                                                 for(int i=0;i<cells.h;i++) {
                                                     for(int j=0;j<cells.w;j++) {
                                                         if(Hauto.doornumber(cells.readCells[i][j])==keyn) {
@@ -305,7 +317,7 @@ public class TestChamber {
                                     if("go-to".equals(opname)) {
                                         executed_going=false;
                                         nar.addInput("<"+goal+" --> [at]>. :|:");
-                                        if (goal.startsWith("pizza")) {
+                                        if (goal.startsWith("{pizza")) {
                                             GridObject ToRemove = null;
                                             for (GridObject obj : space.objects) { //remove pizza
                                                 if (obj instanceof LocalGridObject) {

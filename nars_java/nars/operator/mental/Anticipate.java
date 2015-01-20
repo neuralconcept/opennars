@@ -44,6 +44,7 @@ import nars.inference.BudgetFunctions;
 import nars.inference.TemporalRules;
 import nars.io.Symbols;
 import nars.language.Conjunction;
+import nars.language.Interval;
 import nars.language.Product;
 import nars.language.Term;
 import nars.operator.Operation;
@@ -55,23 +56,13 @@ import nars.plugin.mental.InternalExperience;
  //*
 public class Anticipate extends Operator implements EventObserver, Mental {
 
-    public final Map<Long,LinkedHashSet<Term>> anticipations = new LinkedHashMap();
+    public final Map<Vector2Int,LinkedHashSet<Term>> anticipations = new LinkedHashMap();
             
     final Set<Term> newTasks = new LinkedHashSet();
     NAL nal;
-    
-    //TODO set this by an optional additional parameter to ^anticipate
-    float anticipateDurations = 2f;
-    
-    //* how long to allow a hoped-for event to occurr before counting evidence
-    // *  that it has not.  usually a less than 1.0 value which is a factor of duration 
-    //    "disappointmentOvercomesHopeDuration" 
-    float hopeExpirationDurations = 0.5f; //todo in order to be flexible, modulate confidence of negative event
-    
+
     final static TruthValue expiredTruth = new TruthValue(0.0f, Parameters.DEFAULT_JUDGMENT_CONFIDENCE);
     final static BudgetValue expiredBudget = new BudgetValue(Parameters.DEFAULT_JUDGMENT_PRIORITY, Parameters.DEFAULT_JUDGMENT_DURABILITY, BudgetFunctions.truthToQuality(expiredTruth));
-    
-    transient private int duration;
     
     public Anticipate() {
         super("^anticipate");        
@@ -83,31 +74,52 @@ public class Anticipate extends Operator implements EventObserver, Mental {
         return true;
     }
     
-    
+    class Vector2Int {
+        public long predictionCreationTime; //2014 and this is still the best way to define a data structure that simple?
+        public long predictedOccurenceTime; 
+        public Vector2Int(long predictionCreationTime, long predictedOccurenceTime) { //rest of the crap:
+            this.predictionCreationTime=predictionCreationTime; //when the prediction happened
+            this.predictedOccurenceTime=predictedOccurenceTime; //when the event is expected
+        }
+    }
     
     public void updateAnticipations() {
 
         if (anticipations.isEmpty()) return;
 
         long now=nal.memory.time();
-        
-        this.duration = nal.memory.getDuration();
-        long window = (long)(duration/2f * anticipateDurations);
-        long hopeExpirationWindow = (long)(duration * hopeExpirationDurations);
                 
         //share stamps created by tasks in this cycle
         
         boolean hasNewTasks = !newTasks.isEmpty();
         
-        Iterator<Map.Entry<Long, LinkedHashSet<Term>>> aei = anticipations.entrySet().iterator();
+        Iterator<Map.Entry<Vector2Int, LinkedHashSet<Term>>> aei = anticipations.entrySet().iterator();
         while (aei.hasNext()) {
             
-            Map.Entry<Long, LinkedHashSet<Term>> ae = aei.next();
+            Map.Entry<Vector2Int, LinkedHashSet<Term>> ae = aei.next();
             
-            long aTime = ae.getKey();
-
-            boolean didntHappen = (now-aTime > hopeExpirationWindow);
-            boolean maybeHappened = hasNewTasks && Math.abs(aTime - now) <= window;
+            long aTime = ae.getKey().predictedOccurenceTime;
+            long predictionstarted=ae.getKey().predictionCreationTime;
+            if(aTime < predictionstarted) { //its about the past..
+                return;
+            }
+            
+            //lets say  a and <(&/,a,+4) =/> b> leaded to prediction of b with specific occurence time
+            //this indicates that this interval can be reconstructed by looking by when the prediction
+            //happened and for what time it predicted, Only when the happening would already lead to <(&/,a,+5) =/> b>
+            //we are allowed to apply CWA already, i think this is the perfect time to do this
+            //since there is no way anymore that the observation would support <(&/,a,+4) =/> b> at this time,
+            //also this way it is not applied to early, it seems to be the perfect time to me,
+            //making hopeExpirationWindow parameter entirely osbolete
+            Interval Int=Interval.interval(aTime-predictionstarted, nal.memory);
+            //ok we know the magnitude now, let's now construct a interval with magnitude one higher
+            //(this we can skip because magnitudeToTime allows it without being explicitly constructed)
+            //ok, and what predicted occurence time would that be? because only if now is bigger or equal, didnt happen is true
+            double expiredate=predictionstarted+Interval.magnitudeToTime(Int.magnitude+1, nal.memory.param.duration);
+            //
+            
+            boolean didntHappen = (now>=expiredate);
+            boolean maybeHappened = hasNewTasks && !didntHappen;
                 
             if ((!didntHappen) && (!maybeHappened))
                 continue;
@@ -121,13 +133,13 @@ public class Anticipate extends Operator implements EventObserver, Mental {
                 boolean remove = false;
                 
                 if (didntHappen) {
-                    deriveDidntHappen(aTerm);                                
+                    deriveDidntHappen(aTerm,aTime);                                
                     remove = true;
                 }
 
                 if (maybeHappened) {
                     if (newTasks.remove(aTerm)) {
-                        //it happened like expected                
+                        //it happened, temporal induction will do the rest          
                         remove = true; 
                         hasNewTasks = !newTasks.isEmpty();
                     }
@@ -153,16 +165,13 @@ public class Anticipate extends Operator implements EventObserver, Mental {
             this.nal= (NAL)args[1];
             
             if (newEvent.sentence.truth!=null) {
-                float newTaskExpectation = newEvent.sentence.truth.getExpectation();
-                if (newTaskExpectation > 0.5)
-                    newTasks.add(newEvent.getTerm());
+                newTasks.add(newEvent.getTerm()); //new: always add but keep truth value in mind
             }
         }
 
         if (nal!=null && event == CycleEnd.class) {            
             updateAnticipations();
         }
-        
     }
     
 
@@ -186,6 +195,14 @@ public class Anticipate extends Operator implements EventObserver, Mental {
     boolean anticipationOperator=false; //a parameter which tells whether NARS should know if it anticipated or not
     //in one case its the base functionality needed for NAL8 and in the other its a mental NAL9 operator
     
+    public boolean isAnticipationAsOperator() {
+        return anticipationOperator;
+    }
+    
+    public void setAnticipationAsOperator(boolean val) {
+        anticipationOperator=val;
+    }
+    
     public void anticipate(Term content,Memory memory, long occurenceTime, Task t) {
         if(content instanceof Conjunction && ((Conjunction)content).getTemporalOrder()!=TemporalRules.ORDER_NONE) {
             return;
@@ -194,7 +211,7 @@ public class Anticipate extends Operator implements EventObserver, Mental {
         LinkedHashSet<Term> ae = anticipations.get(occurenceTime);
         if (ae == null) {
             ae = new LinkedHashSet();
-            anticipations.put(occurenceTime, ae);
+            anticipations.put(new Vector2Int(memory.time(),occurenceTime), ae);
         }
         ae.add(content);
         
@@ -218,24 +235,19 @@ public class Anticipate extends Operator implements EventObserver, Mental {
         }
     }
 
-    protected void deriveDidntHappen(Term aTerm) {
+    protected void deriveDidntHappen(Term aTerm, long expectedOccurenceTime) {
                 
         TruthValue truth = expiredTruth;
         BudgetValue budget = expiredBudget;
 
         Stamp stamp = new Stamp(nal.memory);
-        int derivation_tolerance_mul=2;
-        stamp.setOccurrenceTime(
-            stamp.getOccurrenceTime()-derivation_tolerance_mul*duration);
-
-
+        stamp.setOccurrenceTime(expectedOccurenceTime-nal.memory.param.duration.get()); //it did not happen, so the time of when it did not 
+        //happen is exactly the time it was expected
+        //todo analyze, why do i need to substract duration here? maybe it is just accuracy thing
+        
         Sentence S = new Sentence(aTerm, Symbols.JUDGMENT_MARK, truth, stamp);
-
         Task task = new Task(S, budget);
-
         nal.derivedTask(task, false, true, null, null); 
-
-        task.setTemporalInducted(true);
+        task.setParticipateInTemporalInduction(true);
     }
-    
 }

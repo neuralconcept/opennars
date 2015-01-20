@@ -7,7 +7,7 @@ import nars.entity.Item;
 import nars.entity.Sentence;
 import nars.entity.Stamp;
 import nars.entity.TruthValue;
-import nars.plugin.applicationspecific.ParticlePlanner.MultipleExecutionManager;
+import nars.plugin.app.plan.MultipleExecutionManager;
 import nars.inference.TemporalRules;
 import nars.io.Symbols;
 import nars.io.Symbols.NativeOperator;
@@ -243,6 +243,9 @@ public class ImplicationGraph extends SentenceGraph<Cause> {
     @Override
     public boolean add(final Sentence s, final CompoundTerm ct, final Item c) {
 
+        if(s.truth!=null && s.truth.getExpectation()<0.5) {
+            return false;
+        }
         
         if (!(ct instanceof Implication)) {
             return false;

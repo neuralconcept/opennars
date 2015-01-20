@@ -90,11 +90,16 @@ public class NARSwing  {
         UIManager.put("ScrollBar.opaque", false);
         UIManager.put("ScrollBar.background", Color.BLACK);
         UIManager.put("ScrollBar.border", new EmptyBorder(1,1,1,1));
+        
+        UIManager.put("Table.background", Color.BLACK);
+        UIManager.put("Table.foreground", Color.WHITE);
+        UIManager.put("TableHeader.background", Color.BLACK);
+        UIManager.put("TableHeader.foreground", Color.ORANGE);
     }
 
     public final NAR nar;
-    private final NWindow mainWindow;
-    private final NARControls controls;
+    public final NWindow mainWindow;
+    public final NARControls controls;
 
     public NARSwing(NAR nar) {
         this(nar, true);

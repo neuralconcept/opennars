@@ -9,6 +9,9 @@ import java.util.Collection;
 import java.util.List;
 import nars.core.Events;
 import nars.core.Memory;
+import nars.core.NAR;
+import nars.core.Parameters;
+import nars.core.Plugin;
 import nars.entity.BudgetValue;
 import nars.entity.Concept;
 import nars.entity.Sentence;
@@ -17,6 +20,7 @@ import nars.entity.Task;
 import nars.entity.TaskLink;
 import nars.entity.TermLink;
 import nars.entity.TruthValue;
+import nars.inference.TruthFunctions;
 import nars.language.CompoundTerm;
 import nars.language.Interval;
 import nars.language.Negation;
@@ -30,9 +34,15 @@ import nars.operator.mental.Anticipate;
  */
 public abstract class NAL implements Runnable {
 
-    public interface DerivationFilter {
+    public interface DerivationFilter extends Plugin {
         /** returns null if allowed to derive, or a String containing a short rejection reason for logging */
         public String reject(NAL nal, Task task, boolean revised, boolean single, Task parent, Sentence otherBelief);
+
+        @Override
+        public default boolean setEnabled(NAR n, boolean enabled) {
+            return true;
+        }
+        
     }
     
         
@@ -181,7 +191,7 @@ public abstract class NAL implements Runnable {
             ((Anticipate)memory.getOperator("^anticipate")).anticipate(task.sentence.term, memory, task.sentence.getOccurenceTime(),task);
         }
         
-        task.setTemporalInducted(false);
+        task.setParticipateInTemporalInduction(false);
         memory.event.emit(Events.TaskDerive.class, task, revised, single, occurence, occurence2);
         memory.logic.TASK_DERIVED.commit(task.budget.getPriority());
         addTask(task, "Derived");
@@ -219,12 +229,17 @@ public abstract class NAL implements Runnable {
         
         if ((newContent != null) && (!(newContent instanceof Interval)) && (!(newContent instanceof Variable)) && (!Sentence.invalidSentenceTerm(newContent))) {
             
+            if(newContent.subjectOrPredicateIsIndependentVar()) {
+                return null;
+            }
+            
+            Task derived = null;
+            
             try {
                 final Sentence newSentence = new Sentence(newContent, getCurrentTask().sentence.punctuation, newTruth, getTheNewStamp());
 
                 final Task newTask = Task.make(newSentence, newBudget, getCurrentTask(), getCurrentBelief());
-
-                Task derived = null;
+                
                 if (newTask!=null) {
                     boolean added = derivedTask(newTask, false, false, null, null);
                     if (added && temporalAdd) {
@@ -234,11 +249,36 @@ public abstract class NAL implements Runnable {
                         derived=newTask;
                     }
                 }
-                return derived;
             }
             catch (CompoundTerm.UnableToCloneException e) {
                 return null;
             }
+            
+            
+            //"Since in principle it is always valid to eternalize a tensed belief"
+            if(temporalAdd && Parameters.IMMEDIATE_ETERNALIZATION) { //temporal induction generated ones get eternalized directly
+                
+                try {
+
+                TruthValue truthEt=TruthFunctions.eternalize(newTruth);               
+                Stamp st=getTheNewStamp().clone();
+                st.setEternal();
+                final Sentence newSentence = new Sentence(newContent, getCurrentTask().sentence.punctuation, truthEt, st);
+                final Task newTask = Task.make(newSentence, newBudget, getCurrentTask(), getCurrentBelief());
+                if (newTask!=null) {
+                    boolean added = derivedTask(newTask, false, false, null, null);
+                    if (added && temporalAdd) {
+                        memory.temporalRuleOutputToGraph(newSentence, newTask);
+                    }
+                }
+                
+            }
+            catch (CompoundTerm.UnableToCloneException e) {
+                return null;
+            }
+                
+            }
+            return derived;
         }
         return null;
     }
@@ -305,6 +345,11 @@ public abstract class NAL implements Runnable {
             // to answer a question with negation in NAL-5 --- move to activated task?
             setTheNewStamp(new Stamp(getCurrentBelief().stamp, getTime()));
         }
+        
+        if(newContent.subjectOrPredicateIsIndependentVar()) {
+            return false;
+        }
+        
         Sentence newSentence = new Sentence(newContent, punctuation, newTruth, getTheNewStamp());
         Task newTask = Task.make(newSentence, newBudget, getCurrentTask());
         if (newTask!=null) {

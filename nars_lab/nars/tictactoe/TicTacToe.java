@@ -37,7 +37,8 @@ import java.util.Set;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import nars.NARPrologMirror;
+import nars.core.EventEmitter.EventObserver;
+import nars.core.Events.FrameEnd;
 import nars.core.Memory;
 import nars.core.NAR;
 import nars.core.Parameters;
@@ -83,24 +84,30 @@ public class TicTacToe extends JPanel {
     public TicTacToe() {
         super(new BorderLayout());
 
-        nar = new Discretinuous().
+        nar = new NAR(new Discretinuous().
                 setConceptBagSize(1000).
                 setSubconceptBagSize(10000).
-                simulationTime().build();
-        
-        new NARPrologMirror(nar, 0.75f, true).temporal(true, false);
-        new NARPrologMirror(nar, 0.75f, true).temporal(false, true);
+                simulationTime());
         
         nar.memory.addOperator(new AddO("^addO"));        
         (nar.param).duration.set(1000);
         (nar.param).noiseLevel.set(0);
         
         new NARSwing(nar);    
-        nar.start(30, 2000);
+        nar.on(FrameEnd.class, new EventObserver() {
+
+            @Override
+            public void event(Class event, Object[] args) {
+                nar.memory.addSimulationTime(500);
+            }
+            
+        });
+        nar.start(30);
         
         JPanel menu = new JPanel(new FlowLayout());
 
         JButton resetButton = new JButton("RESET");
+        resetButton.setBackground(Color.DARK_GRAY);
         resetButton.addActionListener(new ActionListener() {
             @Override public void actionPerformed(ActionEvent e) {
                 reset();
@@ -112,6 +119,7 @@ public class TicTacToe extends JPanel {
         menu.add(status);
         
         JButton teachButton = new JButton("Re-Explain rules to NARS");
+        teachButton.setBackground(Color.DARK_GRAY);
         teachButton.addActionListener(new ActionListener() {
             @Override public void actionPerformed(ActionEvent e) {
                 teach();

@@ -296,13 +296,13 @@ public class Rover2 extends PhysicsModel {
                 float priority = operation.getTask().budget.getPriority();
 
                 String command = "";
-                if (args.length == 1) {
+                if (args.length == 1+1) {
                     command = t1.name().toString();
                 }
-                if (args.length == 2) {
+                if (args.length == 2+1) {
                     Term t2 = args[1];
                     command = t1.name().toString() + "," + t2.name().toString();
-                } else if (args.length == 3) {
+                } else if (args.length == 3+1) {
                     Term t2 = args[1];
                     Term t3 = args[2];
                     command = t1.name().toString() + "," + t2.name().toString() + "," + t3.name().toString();
@@ -362,9 +362,9 @@ public class Rover2 extends PhysicsModel {
         
 
         float framesPerSecond = 30f;
-        int cyclesPerFrame = 100; //was 200        
+        int cyclesPerFrame = 4; //was 200        
         (nar.param).noiseLevel.set(0);
-        (nar.param).duration.set(cyclesPerFrame);
+        (nar.param).duration.set(cyclesPerFrame*2);
         (nar.param).conceptForgetDurations.set(5f);
         (nar.param).taskLinkForgetDurations.set(10f);
         (nar.param).termLinkForgetDurations.set(25f);
@@ -376,6 +376,13 @@ public class Rover2 extends PhysicsModel {
         // RoverWorld.world= new RoverWorld(rv, 48, 48);
         new NARPhysics<Rover2>(nar, 1.0f / framesPerSecond, theRover = new Rover2(nar)) {
 
+            @Override
+            public void cycle() {
+                super.cycle(); 
+                nar.memory.addSimulationTime(cyclesPerFrame);
+            }
+
+            
             @Override
             public void keyPressed(KeyEvent e) {
 
@@ -419,7 +426,7 @@ public class Rover2 extends PhysicsModel {
 
         };
 
-        nar.startFPS(framesPerSecond, cyclesPerFrame, 1.0f);
+        nar.start((long)(1000f/framesPerSecond));
 
         // new NWindow("Tasks",new TaskTree(nar)).show(300,600);
     }

@@ -20,23 +20,29 @@
  */
 package nars.entity;
 
-import nars.core.control.AbstractTask;
 import com.google.common.base.Strings;
+import java.lang.ref.WeakReference;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import nars.core.control.AbstractTask;
 import nars.language.CompoundTerm;
 import nars.language.Term;
 import nars.language.Terms.Termable;
 import nars.operator.Operation;
 
 /**
- * A task to be processed, consists of a Sentence and a BudgetValue
+ * A task to be processed, consists of a Sentence and a BudgetValue.
+ * A task references its parent and an optional causal factor (usually an Operation instance).  These are implemented as WeakReference to allow forgetting via the
+ * garbage collection process.  Otherwise, Task ancestry would grow unbounded,
+ * violating the assumption of insufficient resources (AIKR).
  */
 public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements Termable {
 
+    /** placeholder for a forgotten task */
+    public static final Task Forgotten = new Task();
 
-    //TODO restrict T extends CompoundTerm
+    
 
     /**
      * The sentence of the Task
@@ -45,7 +51,7 @@ public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements T
     /**
      * Task from which the Task is derived, or null if input
      */
-    public final Task parentTask;
+    final WeakReference<? extends Task> parentTask;
     /**
      * Belief from which the Task is derived, or null if derived from a theorem
      */
@@ -55,7 +61,8 @@ public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements T
      */
     private Sentence bestSolution;
     
-    private Operation cause;
+    /** causal factor; usually an instance of Operation */
+    private WeakReference<Term> cause;
     
     
     
@@ -66,13 +73,17 @@ public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements T
      * @param b The budget
      */
     public Task(final Sentence<T> s, final BudgetValue b) {
-        this(s, b, null, null);
+        this(s, b, (WeakReference)null, null, null);
     }
  
     public Task(final Sentence<T> s, final BudgetValue b, final Task parentTask) {
         this(s, b, parentTask, null);        
     }
 
+    protected Task() {
+        this(null, null);
+    }
+    
     private boolean temporalInducted=true;
     
     /**
@@ -84,15 +95,16 @@ public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements T
      * @param parentBelief The belief from which this new task is derived
      */
     public Task(final Sentence<T> s, final BudgetValue b, final Task parentTask, final Sentence parentBelief) {
+        this(s, b, new WeakReference(parentTask), parentBelief, null);
+    }
+
+    public Task(final Sentence<T> s, final BudgetValue b, final WeakReference<Task> parentTask, final Sentence parentBelief, Sentence solution) {    
         super(b);
-        if (!(s.term instanceof CompoundTerm)) {
-            throw new RuntimeException("Invalid task term: " + s);
-        }
         this.sentence = s;
         this.parentTask = parentTask;
         this.parentBelief = parentBelief;
+        this.bestSolution = solution;   
     }
-
     /**
      * Constructor for an activated task
      *
@@ -103,8 +115,7 @@ public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements T
      * @param solution The belief to be used in future inference
      */
     public Task(final Sentence<T> s, final BudgetValue b, final Task parentTask, final Sentence parentBelief, final Sentence solution) {
-        this(s, b, parentTask, parentBelief);
-        this.bestSolution = solution;
+        this(s, b, new WeakReference(parentTask), parentBelief, solution);
     }
 
     public Task clone() {
@@ -231,7 +242,8 @@ public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements T
      * @return The task from which the task is derived
      */
     public Task getParentTask() {
-        return parentTask;
+        if (parentTask == null) return null;
+        return parentTask.get();
     }
 
     /**
@@ -243,8 +255,10 @@ public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements T
     public String toStringLong() {
         final StringBuilder s = new StringBuilder();
         s.append(super.toString()).append(' ').append(sentence.stamp.name());
-        if (parentTask != null) {
-            s.append("  \n from task: ").append(parentTask.toStringExternal());
+        
+        Task pt = getParentTask();
+        if (pt != null) {
+            s.append("  \n from task: ").append(pt.toStringExternal());
             if (parentBelief != null) {
                 s.append("  \n from belief: ").append(parentBelief.toString());
             }
@@ -288,13 +302,15 @@ public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements T
         return p;
     }
 
-    public void setCause(final Operation op) {
-        this.cause = op;
+    /** generally, op will be an Operation instance */
+    public void setCause(final Term op) {
+        this.cause = new WeakReference(op);
     }
 
     /** the causing Operation, or null if not applicable. */
-    public Operation getCause() {
-        return cause;
+    public Term getCause() {
+        if (cause == null) return null;
+        return cause.get();
     }
 
     public String getExplanation() {
@@ -307,8 +323,10 @@ public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements T
         }
         if (parentBelief!=null)
             x += "  parentBelief=" + parentBelief + " @ " + parentBelief.getCreationTime() + "\n";
-        if (parentTask!=null) {
-            x += "  parentTask=" + parentTask + " @ " + parentTask.getCreationTime() + "\n";
+        
+        Task pt = getParentTask();
+        if (pt!=null) {
+            x += "  parentTask=" + pt + " @ " + pt.getCreationTime() + "\n";
         
             int indentLevel = 1;
             Task p=getParentTask();
@@ -362,12 +380,12 @@ public class Task<T extends Term> extends AbstractTask<Sentence<T>> implements T
         end(false);
     }
 
-    /** flag to indicate whether this Task was Temporally Inducted */
-    public void setTemporalInducted(boolean b) {
+    /** flag to indicate whether this Event Task participates in tempporal induction */
+    public void setParticipateInTemporalInduction(boolean b) {
         this.temporalInducted = b;
     }
 
-    public boolean isTemporalInducted() {
+    public boolean isParticipatingInTemporalInduction() {
         return temporalInducted;
     }
 

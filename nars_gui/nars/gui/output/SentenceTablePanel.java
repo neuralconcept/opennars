@@ -1,6 +1,9 @@
 package nars.gui.output;
 
+import automenta.vivisect.swing.NWindow;
+import automenta.vivisect.swing.PCanvas;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -14,15 +17,16 @@ import nars.core.NAR;
 import nars.entity.Sentence;
 import nars.entity.Task;
 import nars.entity.TruthValue;
+import nars.gui.output.graph.TermSyntaxVis;
+import nars.language.Term;
 
 public class SentenceTablePanel extends TablePanel {
 
     private final JButton syntaxGraphButton;
+    private PCanvas syntaxPanel=null;
 
     public SentenceTablePanel(NAR nar) {
         super(nar);
-
-        setLayout(new BorderLayout());
 
         data = newModel();
 
@@ -41,13 +45,12 @@ public class SentenceTablePanel extends TablePanel {
         table.getColumn("Priority").setMaxWidth(64);
         table.getColumn("Complexity").setMaxWidth(64);
         table.getColumn("Time").setMaxWidth(72);
-
-        add(new JScrollPane(table), BorderLayout.CENTER);
-
+        
         JPanel menu = new JPanel(new FlowLayout(FlowLayout.LEFT));
         {
             syntaxGraphButton = new JButton("Graph");
             syntaxGraphButton.setEnabled(false);
+            syntaxGraphButton.setBackground(Color.DARK_GRAY);
             syntaxGraphButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -57,6 +60,7 @@ public class SentenceTablePanel extends TablePanel {
             menu.add(syntaxGraphButton);
 
             JButton clearButton = new JButton("Clear");
+            clearButton.setBackground(Color.DARK_GRAY);
             clearButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -85,6 +89,19 @@ public class SentenceTablePanel extends TablePanel {
     }
 
     public void newSelectedGraphPanel() {
+        Term[] sel=new Term[table.getSelectedRows().length];
+        int k=0;
+        for(int i: table.getSelectedRows()) {
+            Sentence w=(Sentence) table.getValueAt(i, 1);
+            sel[k]=w.term;
+            k++;
+        }
+        TermSyntaxVis tt = new TermSyntaxVis(sel);
+        syntaxPanel = new PCanvas(tt);
+        syntaxPanel.setZoom(10f);
+        NWindow w = new NWindow("", syntaxPanel);
+        w.setSize(400, 400);
+        w.setVisible(true);
 //        ProcessingGraphPanel2 pgp = new ProcessingGraphPanel2(getSelectedRows(1)) {
 //
 //            @Override
@@ -185,7 +202,8 @@ public class SentenceTablePanel extends TablePanel {
                 conf = truth.getConfidence();
             }
 
-            String parentTask = (t.parentTask != null) ? t.parentTask.toStringExternal() : "";
+            Task pt = t.getParentTask();
+            String parentTask = (pt != null) ? pt.toStringExternal() : "";
 
             //TODO use table sort instead of formatting numbers with leading '0's
             data.addRow(new Object[]{

@@ -17,6 +17,7 @@ import nars.core.Events.Perceive;
 import nars.core.Memory.TaskSource;
 import nars.core.Memory.Timing;
 import nars.core.control.AbstractTask;
+import nars.core.control.NAL.DerivationFilter;
 import nars.entity.BudgetValue;
 import nars.entity.Concept;
 import nars.entity.Sentence;
@@ -194,11 +195,16 @@ public class NAR implements Runnable, TaskSource {
         return addInput(-1, -1, taskText, frequency, confidence);
     }
     
-    
-    public NAR believe(String termString, Tense tense, float freq, float conf) throws InvalidInputException {
+   public NAR believe(float pri, float dur, String termString, Tense tense, float freq, float conf) throws InvalidInputException {
         
         return addInput(memory.newTask(new Narsese(this).parseTerm(termString),
-                Symbols.JUDGMENT_MARK, freq, conf, Parameters.DEFAULT_JUDGMENT_PRIORITY, Parameters.DEFAULT_JUDGMENT_DURABILITY, tense));
+                Symbols.JUDGMENT_MARK, freq, conf, pri, dur, tense));
+    }
+
+   
+    public NAR believe(String termString, Tense tense, float freq, float conf) throws InvalidInputException {
+        
+        return believe(Parameters.DEFAULT_JUDGMENT_PRIORITY, Parameters.DEFAULT_JUDGMENT_DURABILITY, termString, tense, freq, conf);
     }
 
     
@@ -220,7 +226,7 @@ public class NAR implements Runnable, TaskSource {
                                 new Narsese(this).parseTerm(termString),
                                 Symbols.QUESTION_MARK, 
                                 null, 
-                                new Stamp(memory)), 
+                                new Stamp(memory, Tense.Eternal)), 
                         new BudgetValue(
                                 Parameters.DEFAULT_QUESTION_PRIORITY, 
                                 Parameters.DEFAULT_QUESTION_DURABILITY, 
@@ -352,7 +358,12 @@ public class NAR implements Runnable, TaskSource {
                 throw new RuntimeException(ex.toString());
             emit(ERR.class, ex);
         }
+        
         ioChanged = true;
+        
+        if (!running)
+            updatePorts();
+
         return i;
     }
 
@@ -368,6 +379,9 @@ public class NAR implements Runnable, TaskSource {
         if (p instanceof Operator) {
             memory.addOperator((Operator)p);
         }
+        if (p instanceof DerivationFilter) {
+            param.defaultDerivationFilters.add((DerivationFilter)p);
+        }
         PluginState ps = new PluginState(p);
         plugins.add(ps);
         emit(Events.PluginsChange.class, p, null);
@@ -379,6 +393,9 @@ public class NAR implements Runnable, TaskSource {
             if (p instanceof Operator) {
                 memory.removeOperator((Operator)p);
             }
+            if (p instanceof DerivationFilter) {
+                param.defaultDerivationFilters.remove((DerivationFilter)p);
+            }
             ps.setEnabled(false);
             emit(Events.PluginsChange.class, null, p);
         }
@@ -387,15 +404,9 @@ public class NAR implements Runnable, TaskSource {
     public List<PluginState> getPlugins() {
         return Collections.unmodifiableList(plugins);
     }
-    
 
-    public void startFPS(final float targetFPS, int cyclesPerFrame, float durationsPerFrame) {        
-        long cycleTime = (long)(1000f / targetFPS);
-        param.duration.set((int)(cyclesPerFrame / durationsPerFrame));
-        start(cycleTime, cyclesPerFrame);        
-    }
     
-    public void start(final long minCyclePeriodMS, int cyclesPerFrame) {
+    @Deprecated public void start(final long minCyclePeriodMS, int cyclesPerFrame) {
         this.minCyclePeriodMS = minCyclePeriodMS;
         this.cyclesPerFrame = cyclesPerFrame;
         if (thread == null) {
@@ -411,8 +422,6 @@ public class NAR implements Runnable, TaskSource {
      * @param minCyclePeriodMS minimum cycle period (milliseconds).
      */    
     public void start(final long minCyclePeriodMS) {
-        if (memory.getTiming()!=Timing.Iterative) 
-            throw new RuntimeException("Invalid timing mode for start(minCyclePeriodMS)");
         start(minCyclePeriodMS, 1);
     }
 
@@ -632,9 +641,6 @@ public class NAR implements Runnable, TaskSource {
                         "@" + timeEnd + ": Real-time consumed by frame (" + 
                                 frameTime + " ms) exceeds reasoner Duration (" + d + " cycles)" );
             }
-        }
-        else if (memory.getTiming() == Timing.Simulation) {
-            memory.addSimulationTime(getSimulationTimeCyclesPerFrame());
         }
     }
     

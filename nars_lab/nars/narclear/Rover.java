@@ -12,6 +12,7 @@ import javax.swing.JButton;
 import javax.swing.JPanel;
 import nars.core.Memory;
 import nars.core.NAR;
+import nars.core.Parameters;
 import nars.core.build.Default;
 import nars.entity.Task;
 import nars.io.ChangedTextInput;
@@ -20,6 +21,8 @@ import nars.language.Term;
 import nars.narclear.jbox2d.TestbedSettings;
 import nars.operator.NullOperator;
 import nars.operator.Operation;
+import nars.plugin.app.plan.TemporalParticlePlanner;
+import nars.plugin.mental.InternalExperience;
 import org.jbox2d.collision.shapes.PolygonShape;
 import org.jbox2d.common.Color3f;
 import org.jbox2d.common.MathUtils;
@@ -129,11 +132,11 @@ public class Rover extends PhysicsModel {
             
             
             
-            int pixels = 3;
-            float aStep = 1.5f / pixels;
+            int pixels = 8;
+            float aStep = 1.8f / pixels;
             float retinaArc = aStep;
             int retinaResolution = 5; //should be odd # to balance
-            float L = 35.0f;
+            float L = 50.0f;
             Vec2 frontRetina = new Vec2(0, 0.5f);
             for (int i = -pixels/2; i <= pixels/2; i++) {
                 vision.add(new VisionRay(world,"front" + i, torso, frontRetina, MathUtils.PI/2f + aStep*i*1.0f,
@@ -279,8 +282,9 @@ public class Rover extends PhysicsModel {
                     //sight.set("<(*," + id + "," + dist + ","+Sgood+") --> see>. :|:");
                     if(Sgood.equals("bad") && n%25==0) {
                         nar.addInput("(--,<(*," + id + ",good) --> see>). :|:");
-                    } else if(n%25==0) {
-                        nar.addInput("<(*," + id + ",good) --> see>. :|:");
+                    } else if(n%50==0) {
+                        //nar.addInput("<(*," + id + ",good) --> see>. :|:");
+                        nar.addInput("<(*," + id + "," + dist + ","+Sgood+") --> see>. :|:");
                     }
                 }
                 else {
@@ -434,9 +438,9 @@ public class Rover extends PhysicsModel {
             for (int i = 0; i < 10; i++) {
                 AddABlock(p, w, h,false);
             }
-            for (int i = 0; i < 10; i++) {
+            /*for (int i = 0; i < 10; i++) {
                 AddABlock(p, w, h,true);
-            }
+            }*/
         }
 
         public void AddABlock(PhysicsModel p, float w, float h, boolean bad) {
@@ -613,19 +617,24 @@ public class Rover extends PhysicsModel {
     public static void main(String[] args) {
         //NAR nar = new Default().
         //NAR nar = new DiscretinuousBagNARBuilder().
-        NAR nar = new Default().setConceptBagSize(100).simulationTime().
+        NAR nar = new Default().simulationTime().
                 build();
-        
+
+        nar.addPlugin(new TemporalParticlePlanner());
         float framesPerSecond = 50f;
         int cyclesPerFrame = 10; //was 200    
         (nar.param).noiseLevel.set(0);
-        (nar.param).decisionThreshold.set(0);
         (nar.param).duration.set(cyclesPerFrame);
         
-
        // RoverWorld.world= new RoverWorld(rv, 48, 48);
-        new NARPhysics<Rover>(nar, 1.0f / framesPerSecond, new Rover(nar)) {
+        NARPhysics phys=new NARPhysics<Rover>(nar, 1.0f / framesPerSecond, new Rover(nar)) {
 
+            @Override
+            public void cycle() {
+                super.cycle(); 
+                nar.memory.addSimulationTime(cyclesPerFrame);
+            }
+            
             @Override
             public void keyPressed(KeyEvent e) {
                  
@@ -671,8 +680,8 @@ public class Rover extends PhysicsModel {
             
         };
         
-        nar.startFPS(framesPerSecond, cyclesPerFrame, 1.0f);
-
+        nar.start(((long)(1000f/framesPerSecond)));//, cyclesPerFrame, 1.0f);
+        phys.sw.controls.setSpeed(1.0f);
        // new NWindow("Tasks",new TaskTree(nar)).show(300,600);
     }
 

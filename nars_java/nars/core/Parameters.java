@@ -51,7 +51,7 @@ public class Parameters {
     /** Evidential Horizon, the amount of future evidence to be considered. 
      * Must be >=1.0, usually 1 .. 2
      */
-    public static final float HORIZON = 1;
+    public static float HORIZON = 1;
     
 
 
@@ -79,7 +79,7 @@ public class Parameters {
     /** Default confidence of input judgment. */
     public static final float DEFAULT_JUDGMENT_CONFIDENCE = (float) 0.9;
     /** Default priority of input judgment */
-    public static final float DEFAULT_JUDGMENT_PRIORITY = (float) 0.8;
+    public static float DEFAULT_JUDGMENT_PRIORITY = (float) 0.8;
     /** Default durability of input judgment */
     public static float DEFAULT_JUDGMENT_DURABILITY = (float) 0.5; //was 0.8 in 1.5.5; 0.5 after
     /** Default priority of input question */
@@ -123,6 +123,8 @@ public class Parameters {
     public static int TEMPORAL_INDUCTION_CHAIN_SAMPLES = 10;
     
 
+    /** what this value represents was originally equal to the termlink record length (10), but we may want to adjust it or make it scaled according to duration since it has more to do with time than # of records.  it can probably be increased several times larger since each item should remain in the recording queue for longer than 1 cycle */
+    public static final int NOVELTY_HORIZON = 10;
 
     /**
      * The rate of confidence decrease in mental operations Doubt and Hesitate
@@ -175,6 +177,10 @@ public class Parameters {
     
     //temporary parameter for setting #threads to use, globally
     public static int THREADS = 1;
+    public static boolean IMMEDIATE_ETERNALIZATION=true;
+    
+    
+    public static int STM_SIZE = 1;
     
     
     

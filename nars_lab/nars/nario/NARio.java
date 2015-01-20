@@ -3,6 +3,7 @@ package nars.nario;
 import java.awt.event.KeyEvent;
 import static java.lang.Math.log;
 import static java.lang.Math.signum;
+import static java.lang.Math.signum;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.SwingUtilities;
@@ -10,6 +11,7 @@ import nars.core.EventEmitter.EventObserver;
 import nars.core.Events;
 import nars.core.Memory;
 import nars.core.NAR;
+import nars.core.Parameters;
 import nars.core.build.Default;
 import nars.entity.Task;
 import nars.gui.NARSwing;
@@ -24,6 +26,8 @@ import nars.nario.sprites.Sparkle;
 import nars.nario.sprites.Sprite;
 import nars.operator.NullOperator;
 import nars.operator.Operation;
+import nars.plugin.app.plan.TemporalParticlePlanner;
+import nars.plugin.mental.InternalExperience;
 
 /**
  *
@@ -31,6 +35,8 @@ import nars.operator.Operation;
  */
 public class NARio extends Run {
 
+    static int memoryCyclesPerFrame = 10;
+    
     private final NAR nar;
     private LevelScene level;
     private float lastX = -1;
@@ -58,6 +64,8 @@ public class NARio extends Run {
         NAR nar = new Default().simulationTime().setConceptBagSize(500).
                 /*temporalPlanner(12,64,16).*/build();
         
+        nar.addPlugin(new TemporalParticlePlanner());
+
        // NAR nar = new CurveBagNARBuilder().simulationTime().build();
         /*nar.param().termLinkRecordLength.set(4);
          nar.param().beliefCyclesToForget.set(30);
@@ -73,8 +81,8 @@ public class NARio extends Run {
        // nar.param().termLinkForgetDurations.set(99.0f);
         
         //new TextOutput(nar, System.out).setShowInput(true);
-        int memCyclesPerFrame = 10;
-        (nar.param).duration.set(memCyclesPerFrame); //2 frames seems good
+        
+        (nar.param).duration.set(memoryCyclesPerFrame); //2 frames seems good
         (nar.param).noiseLevel.set(0);
         (nar.param).decisionThreshold.set(0);
         
@@ -83,11 +91,12 @@ public class NARio extends Run {
 
         
 
-        new NARSwing(nar);
-        nar.startFPS(fps, memCyclesPerFrame, 1f);
+        NARSwing sw=new NARSwing(nar);
+        
+        nar.start(((long)(1000f/fps)));//, memCyclesPerFrame, 1f);
         
         NARio nario = new NARio(nar);
-        
+        sw.controls.setSpeed(0.95f);
     }
 
     ChangedTextInput chg;
@@ -134,7 +143,7 @@ public class NARio extends Run {
     protected void setKey(int k, boolean pressed) {
         if (keyInput[k] == null && pressed)
             keyInput[k] = new ChangedTextInput(nar);
-        nar.addInput("(^keyboard" + k + "," + (pressed ? "on" : "off") + ")!");
+        nar.addInput("(^keyboard" + k + "," + (pressed ? "on" : "off") + "). :|:");
     }
     
     @Override protected void toggleKey(int keyCode, boolean isPressed)
@@ -158,11 +167,15 @@ public class NARio extends Run {
         {
             setKey(3, isPressed);
             scene.toggleKey(Mario.KEY_UP, isPressed);
+            setKey(1, isPressed);
+            scene.toggleKey(Mario.KEY_RIGHT, isPressed);
         }
         if (keyCode == KeyEvent.VK_S)
         {
             setKey(4, isPressed);
             scene.toggleKey(Mario.KEY_JUMP, isPressed);
+            setKey(1, isPressed);
+            scene.toggleKey(Mario.KEY_RIGHT, isPressed);
         }
         if (keyCode == KeyEvent.VK_A)
         {
@@ -182,6 +195,7 @@ public class NARio extends Run {
     public void ready() {
         //level = startLevel(0, 1, LevelGenerator.TYPE_OVERGROUND);
 
+        
         scene = level = new LevelScene(graphicsConfiguration, this, 4,1, LevelGenerator.TYPE_OVERGROUND) {
             @Override
             protected Mario newMario(LevelScene level) {
@@ -252,6 +266,8 @@ public class NARio extends Run {
             @Override
             public void event(Class event, Object... arguments) {
 
+                nar.memory.addSimulationTime(memoryCyclesPerFrame);
+
                 {
         //                int ji = 10;
         //                System.out.print("CONCEPTS: ");
@@ -299,6 +315,8 @@ public class NARio extends Run {
                     {
                         setKey(3, isPressed);
                         scene.toggleKey(Mario.KEY_JUMP, isPressed);
+                        setKey(1, isPressed);
+                        scene.toggleKey(Mario.KEY_RIGHT, isPressed);
                     }
                     if (keyCode == KeyEvent.VK_S)
                     {
@@ -440,7 +458,9 @@ public class NARio extends Run {
                                         else {
                                             System.out.println();
                                         }*/
-                                        
+                                        if(Mario.KEY_UP==k || Mario.KEY_JUMP==k) {
+                                            mario.keys[Mario.KEY_RIGHT] = state.equals("on");
+                                        }
                                         mario.keys[k] = state.equals("on");
                                     //}
 
@@ -518,6 +538,8 @@ public class NARio extends Run {
                 }
                 if(www%200==0) {
                      nar.addInput("<right --> moved>!");
+                     //nar.addInput("<up --> moved>!");
+                     //nar.addInput("<up --> moved>!");
                      /* nar.addInput("<"+direction(1,0)+" --> moved>!"); //move right
                     nar.addInput("<"+direction(2,0)+" --> moved>!"); //move right
                     nar.addInput("<"+direction(1,1)+" --> moved>!"); //move right

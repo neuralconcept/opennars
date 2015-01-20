@@ -22,7 +22,7 @@ import nars.language.Term;
  */
 public class Discretize {
     private final NAR nar;
-    private final int discretization;
+    private int discretization;
     
     /** levels >=2 */
     public Discretize(NAR n, int levels) {
@@ -31,32 +31,44 @@ public class Discretize {
         
     }
     
-    public int f(double p) {
-        if (p <= 0) {
+    public int i(double v) {
+        if (v <= 0) {
             return 0;
         }
-        if (p >= 1f) {
+        if (v >= 1f) {
             return discretization-1;
         }
-        int x = (int)Math.round(-0.5 + p * (discretization));
+        int x = (int)Math.round(-0.5 + v * (discretization));
         return x;
     }
+
+    public void setDiscretization(int discretization) {
+        this.discretization = discretization;
+    }
     
-    public double d(double p) {
-        if (p <= 0) {
+    public double d(double v) {
+        if (v <= 0) {
             return 0;
         }
-        if (p >= 1f) {
+        if (v >= 1f) {
             return discretization-1;
         }
-        double x = (-0.5 + p * (discretization));
+        double x = (-0.5 + v * (discretization));
         return x;
         
     }    
+    
+    /** inverse of discretize */
+    public double continuous(double discretized) {
+        return ((double)discretized) / ((double)discretization-1);
+    }
+    public double continuous(int discretized) {
+        return continuous((double)discretized);
+    }
 
     /** calculate proportion that value 'v' is at level 'l', or somewhere in between levels */
     public double pDiscrete(double v, int i) {        
-        int center = f(v);
+        int center = i(v);
         if (i == center) return 1.0;
         return 0.0;
     }
@@ -72,7 +84,7 @@ public class Discretize {
     /** assign 1.0 to the closest discretized level regardless */
     public double pSmoothDiscrete(double v, int l) {
         double center = d(v);
-        int centerDisc = f(v);
+        int centerDisc = i(v);
         if (centerDisc == l) return 1.0; 
         double levelsFromCenter = Math.abs(l - center);
         double sharpness = 10.0;
@@ -98,7 +110,7 @@ public class Discretize {
     }    
     
     public Term getValueTerm(double y) {
-        return Term.get("y" + f((float)y));
+        return Term.get("y" + i((float)y));
     }
 
     /**
@@ -109,11 +121,14 @@ public class Discretize {
      */
     void believe(String variable, double signal, int dt) {        
         for (int i = 0; i < discretization; i++) {
-            double p = pDiscrete(signal, i);
-            believe(variable, i, dt, (float)p, 0.99f, BeliefInsertion.ImmediateProcess);
+            //double p = pDiscrete(signal, i);
+            double p = pSmoothDiscrete(signal, i);
+            believe(variable, i, dt, (float)p, 0.95f, BeliefInsertion.MemoryInput);
         }
             
     }
+
+    
     
     public static enum BeliefInsertion {
         Input, MemoryInput, ImmediateProcess, BeliefInsertion
@@ -137,6 +152,8 @@ public class Discretize {
             
             Task t = nar.memory.newTask(getValueTerm(variable, level), Symbols.JUDGMENT_MARK, freq, conf, 1.0f, 0.8f);
         
+            System.out.println(t);
+            
             if (mode == BeliefInsertion.MemoryInput)
                 nar.memory.inputTask(t);
             else if (mode == BeliefInsertion.ImmediateProcess)

@@ -148,12 +148,9 @@ public class TemporalRules {
         return order;
     }
     
-    //helper function for temporal induction to not produce wrong terms, only one temporal operator is allowed
+    /** whether temporal induction can generate a task by avoiding producing wrong terms; only one temporal operator is allowed */
     public final static boolean tooMuchTemporalStatements(final Term t) {
-        if(t==null) {
-            return true;
-        }
-        return t.containedTemporalRelations() > 1;
+        return (t == null) || (t.containedTemporalRelations() > 1);
     }
       
     // { A =/> B, B =/> C } |- (&/,A,B) =/> C
@@ -182,6 +179,7 @@ public class TemporalRules {
                     Conjunction ConjA=(Conjunction) A;
                     args=new ArrayList(CB2.term.length+ConjA.term.length);
                     beginoffset=ConjA.size();
+                    
                     for(final Term t: ConjA.term) args.add(t);
                 } else {
                     args = new ArrayList(CB2.term.length + 1);
@@ -209,7 +207,8 @@ public class TemporalRules {
             for(int i=0;i<term.length;i++) {
                 if(term[i] instanceof CompoundTerm) {
                     term[i]=((CompoundTerm) term[i]).applySubstitute(res1);
-                    if(term[i]==null) { //it resulted in invalid term for example <a --> a>, so wrong
+                    if(term[i]==null) { 
+                        //it resulted in invalid term for example <a --> a>, so wrong
                         return false;
                     }
                 }
@@ -270,6 +269,10 @@ public class TemporalRules {
         
         Term t1 = s1.term;
         Term t2 = s2.term;
+                
+        if (Statement.invalidStatement(t1, t2))
+            return Collections.EMPTY_LIST;
+        
         Term t11=null;
         Term t22=null;
         
@@ -302,27 +305,16 @@ public class TemporalRules {
             //allow also temporal induction on operator arguments:
             if(ss2 instanceof Operation ^ ss1 instanceof Operation) {
                 if(ss2 instanceof Operation && !(ss2.getSubject() instanceof Variable)) {//it is an operation, let's look if one of the arguments is same as the subject of the other term
-                    boolean anyone=false;
                     Term comp=ss1.getSubject();
                     Term ss2_term = ((Operation)ss2).getSubject();
                     
-                    boolean applicableVariableType = !(comp instanceof Variable && ((Variable)comp).getType()==Symbols.VAR_INDEPENDENT);
+                    boolean applicableVariableType = !(comp instanceof Variable && ((Variable)comp).hasVarIndep());
                     
                     if(ss2_term instanceof Product) {
                         Product ss2_prod=(Product) ss2_term;
-                        for(final Term t : ss2_prod.term)
-                        {
-                            if(t.equals(comp)) {
-                                anyone=true;
-                            }
-                        }
-                        if(anyone && applicableVariableType) { //only if there is one and it isnt a variable already
-                            Term[] ars = ss2_prod.cloneTerms();
-                            for(int i=0;i<ars.length;i++) {
-                                if(ars[i].equals(comp)) {
-                                    ars[i]=var1;
-                                }
-                            }
+                        
+                        if(applicableVariableType && Terms.contains(ss2_prod.term, comp)) { //only if there is one and it isnt a variable already
+                            Term[] ars = ss2_prod.cloneTermsReplacing(comp, var1);
 
                             t11 = Statement.make(ss1, var1, ss1.getPredicate());
                             
@@ -336,27 +328,18 @@ public class TemporalRules {
                     }
                 }
                 if(ss1 instanceof Operation && !(ss1.getSubject() instanceof Variable)) {//it is an operation, let's look if one of the arguments is same as the subject of the other term
-                    boolean anyone=false;
                     Term comp=ss2.getSubject();
                     Term ss1_term = ((Operation)ss1).getSubject();
                     
-                    boolean applicableVariableType = !(comp instanceof Variable && ((Variable)comp).getType()==Symbols.VAR_INDEPENDENT);
+                    boolean applicableVariableType = !(comp instanceof Variable && ((Variable)comp).hasVarIndep());
                     
                     if(ss1_term instanceof Product) {
                         Product ss1_prod=(Product) ss1_term;
-                        for(final Term t : ss1_prod.term)
-                        {
-                            if(t.equals(comp)) {
-                                anyone=true;
-                            }
-                        }
-                        if(anyone && applicableVariableType) { //only if there is one and it isnt a variable already
-                            Term[] ars = ss1_prod.cloneTerms();
-                            for(int i=0;i<ars.length;i++) {
-                                if(ars[i].equals(comp)) {
-                                    ars[i]=var1;
-                                }
-                            }
+                                               
+                        if(applicableVariableType && Terms.contains(ss1_prod.term, comp)) { //only if there is one and it isnt a variable already
+                            
+                            Term[] ars = ss1_prod.cloneTermsReplacing(comp, var1);
+                            
 
                             t22 = Statement.make(ss2, var1, ss2.getPredicate());
                             
@@ -371,20 +354,22 @@ public class TemporalRules {
                 }
             }
         }
+
         
-        if (Statement.invalidStatement(t1, t2))
-            return Collections.EMPTY_LIST;
-        
-        
-        final Interval.AtomicDuration duration = nal.mem().param.duration;
+        final Interval.AtomicDuration duration = nal.memory.param.duration;
         int durationCycles = duration.get();
         
         long time1 = s1.getOccurenceTime();
         long time2 = s2.getOccurenceTime();
+        
         long timeDiff = time2 - time1;
+        
         List<Interval> interval;
+        
         if (!concurrent(time1, time2, durationCycles)) {
+            
             interval = Interval.intervalTimeSequence(Math.abs(timeDiff), Parameters.TEMPORAL_INTERVAL_PRECISION, nal.mem());
+            
             if (timeDiff > 0) {
                 t1 = Conjunction.make(t1, interval, ORDER_FORWARD);
                 if(t11!=null) {
@@ -416,26 +401,26 @@ public class TemporalRules {
             Statement statement22 = Implication.make(t22, t11, reverseOrder(order));
             Statement statement33 = Equivalence.make(t11, t22, order);
             if(!tooMuchTemporalStatements(statement11)) {
-                Task t=nal.doublePremiseTask(statement11, truth1, budget1,false);
+                Task t=nal.doublePremiseTask(statement11, truth1, budget1,true);
                 if(t!=null) {
                     success.add(t);
                 }
             }
             if(!tooMuchTemporalStatements(statement22)) {
-               Task t=nal.doublePremiseTask(statement22, truth2, budget2,false);
+               Task t=nal.doublePremiseTask(statement22, truth2, budget2,true);
                 if(t!=null) {
                     success.add(t);
                 }
             }
             if(!tooMuchTemporalStatements(statement33)) {
-                Task t=nal.doublePremiseTask(statement33, truth3, budget3,false);
+                Task t=nal.doublePremiseTask(statement33, truth3, budget3,true);
                 if(t!=null) {
                     success.add(t);
                 }
             }
         }
         if(!tooMuchTemporalStatements(statement1)) {
-            Task t=nal.doublePremiseTask(statement1, truth1, budget1,false);
+            Task t=nal.doublePremiseTask(statement1, truth1, budget1,true);
             if(t!=null) {
                     success.add(t);
                 }
@@ -447,7 +432,7 @@ public class TemporalRules {
                 }
             }
         if(!tooMuchTemporalStatements(statement3)) {
-            Task t=nal.doublePremiseTask(statement3, truth3, budget3,false);
+            Task t=nal.doublePremiseTask(statement3, truth3, budget3,true);
             if(t!=null) {
                     success.add(t);
                 }

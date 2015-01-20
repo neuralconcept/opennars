@@ -52,8 +52,8 @@ import nars.entity.Task;
 import nars.entity.TaskLink;
 import nars.entity.TruthValue;
 import nars.inference.BudgetFunctions;
-import nars.plugin.applicationspecific.ParticlePlanner.MultipleExecutionManager;
-import static nars.plugin.applicationspecific.ParticlePlanner.MultipleExecutionManager.isInputOrTriggeredOperation;
+import nars.plugin.app.plan.MultipleExecutionManager;
+import static nars.plugin.app.plan.MultipleExecutionManager.isInputOrTriggeredOperation;
 import nars.inference.TemporalRules;
 import nars.io.Output.ERR;
 import nars.io.Output.IN;
@@ -469,6 +469,11 @@ public class Memory implements Serializable {
     public Concept conceptualize(final BudgetValue budget, final Term term) {
         boolean createIfMissing = true;
         
+        /*Concept c = concept(term);
+        if (c!=null)
+            System.out.print(c.budget + "   ");
+        System.out.println(term + " conceptualize: " + budget);*/
+                
         return concepts.conceptualize(budget, term, createIfMissing);
     }
 
@@ -523,9 +528,9 @@ public class Memory implements Serializable {
         switch (op) {
             
             case SET_EXT_OPENER:
-                return SetExt.make(CompoundTerm.toSortedSet(a));
+                return SetExt.make(a);
             case SET_INT_OPENER:
-                return SetInt.make(CompoundTerm.toSortedSet(a));
+                return SetInt.make(a);
             case INTERSECTION_EXT:
                 return IntersectionExt.make(a);
             case INTERSECTION_INT:
@@ -545,7 +550,7 @@ public class Memory implements Serializable {
             case NEGATION:
                 return Negation.make(a);
             case DISJUNCTION:
-                return Disjunction.make(CompoundTerm.termList(a));
+                return Disjunction.make(a);
             case CONJUNCTION:
                 return Conjunction.make(a);
             case SEQUENCE:
@@ -637,6 +642,7 @@ public class Memory implements Serializable {
         }
         else if (t instanceof Reset) {
             reset();
+            emit(OUT.class,((Reset) t).input);
             emit(IN.class, t);
         }
         else if (t instanceof Echo) {
@@ -1009,10 +1015,12 @@ public class Memory implements Serializable {
         throw new RuntimeException("Questions index for " + c + " does not exist");
     }
     
-    public Task stmLast = null;
+    public final ArrayDeque<Task> stm = new ArrayDeque();
+    //public Task stmLast = null;
+    
     public boolean inductionOnSucceedingEvents(final Task newEvent, NAL nal) {
 
-        if(newEvent.budget==null || !newEvent.isTemporalInducted()) { //todo refine, add directbool in task
+        if(newEvent.budget==null || !newEvent.isParticipatingInTemporalInduction()) { //todo refine, add directbool in task
             return false;
         }
         
@@ -1024,7 +1032,7 @@ public class Memory implements Serializable {
             return false;
         }
 
-        if (stmLast != null) {
+        for (Task stmLast : stm) {
 
             if (equalSubTermsInRespectToImageAndProduct(newEvent.sentence.term, stmLast.sentence.term)) {
                 return false;
@@ -1033,17 +1041,23 @@ public class Memory implements Serializable {
             nal.setTheNewStamp(newEvent.sentence.stamp, stmLast.sentence.stamp, time());
             nal.setCurrentTask(newEvent);
 
-            Sentence currentBelief = stmLast.sentence;
-            nal.setCurrentBelief(currentBelief);
+            Sentence previousBelief = stmLast.sentence;
+            nal.setCurrentBelief(previousBelief);
+            
+            Sentence currentBelief = newEvent.sentence;
 
             //if(newEvent.getPriority()>Parameters.TEMPORAL_INDUCTION_MIN_PRIORITY)
-            TemporalRules.temporalInduction(newEvent.sentence, currentBelief, nal);
+            TemporalRules.temporalInduction(currentBelief, previousBelief, nal);
         }
 
-        //for this heuristic, only use input events & task effects of operations
-        //if(newEvent.getPriority()>Parameters.TEMPORAL_INDUCTION_MIN_PRIORITY) {
-        stmLast = newEvent;
-        //}
+        ////for this heuristic, only use input events & task effects of operations
+        ////if(newEvent.getPriority()>Parameters.TEMPORAL_INDUCTION_MIN_PRIORITY) {
+        //stmLast = newEvent;
+        ////}
+        
+        while (stm.size()+1 > Parameters.STM_SIZE)
+            stm.removeFirst();
+        stm.addLast(newEvent);
 
         return true;
     }

@@ -55,9 +55,9 @@ public class Hauto {
                         }
                     }
                     if(!nope) {
-                        TestChamber.space.add(new Pizza((int)i, (int)j, "pizza"+entityID.toString()));
+                        TestChamber.space.add(new Pizza((int)i, (int)j, "{pizza"+entityID.toString()+"}"));
                         if(TestChamber.staticInformation)
-                        nar.addInput("<pizza"+entityID.toString()+" --> pizza>."); 
+                        nar.addInput("<{pizza"+entityID.toString()+"} --> pizza>."); 
                         entityID++;
                     }
                 }
@@ -176,7 +176,7 @@ public class Hauto {
              readCells[(int) x][(int) y].name = "place"+entityID.toString();
             writeCells[(int) x][(int) y].name = "place"+entityID.toString();
             if(TestChamber.staticInformation)
-            nar.addInput("<"+"place"+entityID.toString()+" --> place>.");
+            nar.addInput("<"+"{place"+entityID.toString()+"} --> place>.");
             if(TestChamber.curiousity) {
                 space.nar.addInput("<(^go-to," + "place"+entityID.toString() + ") =/> <Self --> [curious]>>.");
             }
@@ -253,7 +253,7 @@ public class Hauto {
             return;
         }
         if(selected.material==Material.Pizza) {
-            doorname+="pizza"+entityID.toString();
+            doorname="{pizza"+entityID.toString()+"}";
         }
         if(!"".equals(doorname) && selected.material==Material.Pizza) {
             space.add(new Pizza((int)x, (int)y, doorname));

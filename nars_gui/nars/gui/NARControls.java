@@ -34,6 +34,7 @@ import automenta.vivisect.timeline.StackedPercentageChart;
 import java.awt.BorderLayout;
 import static java.awt.BorderLayout.CENTER;
 import static java.awt.BorderLayout.NORTH;
+import java.awt.Color;
 import java.awt.Dialog;
 import java.awt.FileDialog;
 import java.awt.Font;
@@ -74,9 +75,9 @@ import nars.gui.output.TimelinePanel;
 import nars.gui.output.chart.MeterVis;
 import nars.gui.output.graph.NARGraphDisplay;
 import nars.gui.output.graph.NARGraphPanel;
-import nars.plugin.applicationspecific.ParticlePlanner.MultipleExecutionManager;
-import nars.plugin.applicationspecific.ParticlePlanner.MultipleExecutionManager.Execution;
-import nars.plugin.applicationspecific.ParticlePlanner.GraphExecutive;
+import nars.plugin.app.plan.MultipleExecutionManager;
+import nars.plugin.app.plan.MultipleExecutionManager.Execution;
+import nars.plugin.app.plan.GraphExecutive;
 import nars.io.TextInput;
 import nars.io.TextOutput;
 import nars.io.meter.CompoundMeter;
@@ -283,13 +284,7 @@ public class NARControls extends JPanel implements ActionListener, EventObserver
 //            
             
             
-            /*
-            not working anyway, like multiple input of
-            <a --> b>. :|:
-            6
-            <x --> y>. :|:
-            shows
-            
+
             JMenuItem imv = new JMenuItem("+ Eternalized Implications Graph");
             imv.addActionListener(new ActionListener() {
                 @Override
@@ -304,7 +299,7 @@ public class NARControls extends JPanel implements ActionListener, EventObserver
                                     ))).show(500, 500);
                 }
             });
-            m.add(imv); */
+            m.add(imv); 
 //
 //            JMenuItem sg = new JMenuItem("+ Inheritance / Similarity Graph");
 //            sg.addActionListener(new ActionListener() {
@@ -483,7 +478,7 @@ public class NARControls extends JPanel implements ActionListener, EventObserver
         
         
         init();
-
+        volumeSlider.setValue(nar.param.noiseLevel.get());
         
     }
 
@@ -644,8 +639,11 @@ public class NARControls extends JPanel implements ActionListener, EventObserver
 
     
     private NSlider newSpeedSlider() {
+            final StringBuilder sb = new StringBuilder(32);
+
         final NSlider s = new NSlider(0f, 0f, 1.0f) {
 
+            
             @Override
             public String getText() {
                 if (value == null) {
@@ -653,20 +651,28 @@ public class NARControls extends JPanel implements ActionListener, EventObserver
                 }
                 
                 Timing tt = memory.param.getTiming();
-                String s = "@" +
-                        ((tt == Real || tt == Simulation) ?
-                            + memory.time() + "|" + memory.getCycleTime() : memory.time());
+                
+                if (sb.length() > 0) sb.setLength(0);
+                
+                sb.append('@');
+                
+                if ((tt == Real) || (tt == Simulation)) {
+                    sb.append(memory.time() + "|" + memory.getCycleTime());
+                }
+                else {
+                    sb.append(memory.time());
+                }
                         
                 
 
                 if (currentSpeed == 0) {
-                    s += " - pause";
+                    sb.append(" - pause");
                 } else if (currentSpeed == 1.0) {
-                    s += " - run max speed";
+                    sb.append(" - run max speed");
                 } else {
-                    s += " - run " + nar.getMinCyclePeriodMS() + " ms / step";
+                    sb.append(" - run ").append(nar.getMinCyclePeriodMS()).append(" ms / step");
                 }
-                return s;
+                return sb.toString();
             }
 
             @Override
@@ -802,15 +808,18 @@ public class NARControls extends JPanel implements ActionListener, EventObserver
         pc.setLayout(new GridLayout(1, 0));
 
         stopButton = new AwesomeButton(FA_StopCharacter);
+        stopButton.setBackground(Color.DARK_GRAY);
         stopButton.addActionListener(this);
         pc.add(stopButton);
 
         walkButton = new AwesomeButton('\uf051');
+        walkButton.setBackground(Color.DARK_GRAY);
         walkButton.setToolTipText("Walk 1 Cycle");
         walkButton.addActionListener(this);
         pc.add(walkButton);
 
         JButton focusButton = new AwesomeButton(FA_FocusCharacter);
+        focusButton.setBackground(Color.DARK_GRAY);
         focusButton.setToolTipText("Focus");
         focusButton.addActionListener(new ActionListener() {
 

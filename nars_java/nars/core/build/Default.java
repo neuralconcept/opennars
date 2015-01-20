@@ -1,15 +1,18 @@
 package nars.core.build;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import nars.core.Attention;
+import nars.core.Build;
 import nars.core.Memory;
 import nars.core.Memory.Forgetting;
 import nars.core.Memory.Timing;
 import nars.core.NAR;
-import nars.core.Build;
 import nars.core.Param;
 import static nars.core.build.Default.InternalExperienceMode.Full;
 import static nars.core.build.Default.InternalExperienceMode.Minimal;
@@ -22,15 +25,16 @@ import nars.entity.Task;
 import nars.entity.TaskLink;
 import nars.entity.TermLink;
 import nars.io.DefaultTextPerception;
+import nars.io.TextInput;
 import nars.language.Term;
 import nars.operator.Operator;
 import nars.operator.mental.Anticipate;
-import nars.operator.mental.filter.DeriveOnlyDemandedTasks;
+import nars.plugin.app.plan.TemporalParticlePlanner;
 import nars.plugin.mental.Abbreviation;
 import nars.plugin.mental.Counting;
 import nars.plugin.mental.FullInternalExperience;
 import nars.plugin.mental.InternalExperience;
-import nars.plugin.applicationspecific.ParticlePlanner.TemporalParticlePlanner;
+import nars.plugin.mental.RuntimeNARSettings;
 import nars.storage.Bag;
 import nars.storage.CacheBag;
 import nars.storage.LevelBag;
@@ -143,6 +147,7 @@ public class Default extends Build implements ConceptBuilder {
                 
         n.addPlugin(new DefaultTextPerception());
         
+        n.addPlugin(new RuntimeNARSettings());
         
         if(pluginPlanner!=null) {
             n.addPlugin(pluginPlanner);
@@ -157,23 +162,11 @@ public class Default extends Build implements ConceptBuilder {
             n.addPlugin(new FullInternalExperience());
             n.addPlugin(new Abbreviation());
             n.addPlugin(new Counting());
-            n.addPlugin(new Anticipate());      // expect an event
         }
         
         return n;
     }
 
-    /**
-     * only allowing derivation of tasks where a demand(goal) exists
-     * this is one of the aspects which make metacat fast
-     * that there is a global optimization criteria which controls the entire ting
-     * WARNING: this mode does not apply to AGI
-     */
-    public Default deriveOnlyDemandedTasks() {
-        param.getDerivationFilters().add(new DeriveOnlyDemandedTasks());
-        return this;
-    }
-    
 
     ConceptBuilder getConceptBuilder() {
         return this;
@@ -297,7 +290,9 @@ public class Default extends Build implements ConceptBuilder {
     
     
     public static class CommandLineNARBuilder extends Default {
-
+        
+        List<String> filesToLoad = new ArrayList();
+        
         public CommandLineNARBuilder(String[] args) {
             super();
 
@@ -308,13 +303,37 @@ public class Default extends Build implements ConceptBuilder {
                     int sl = Integer.parseInt(arg);                
                     param.noiseLevel.set(100-sl);
                 }
-                if ("--noise".equals(arg)) {
+                else if ("--noise".equals(arg)) {
                     arg = args[++i];
                     int sl = Integer.parseInt(arg);                
                     param.noiseLevel.set(sl);
-                }            
+                }    
+                else {
+                    filesToLoad.add(arg);
+                }
+                
             }        
         }
+
+        @Override
+        public NAR init(NAR n) {
+            n = super.init(n); 
+            
+            for (String x : filesToLoad) {
+                try {
+                    n.addInput( new TextInput(new File(x) ) );
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+                n.run(1);
+            }
+            
+            return n;
+        }
+
+        
+        
+        
         /**
          * Decode the silence level
          *

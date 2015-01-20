@@ -6,8 +6,8 @@ import nars.core.EventEmitter.EventObserver;
 import nars.core.control.FireConcept;
 import nars.core.control.NAL;
 import nars.entity.Concept;
+import nars.entity.Sentence;
 import nars.entity.Task;
-import nars.entity.TaskLink;
 
 /** empty event classes for use with EventEmitter */
 public class Events {
@@ -58,8 +58,26 @@ public class Events {
     public static class ConceptRemember {    }
     
     public static class ConceptForget { }
-    public static class ConceptBeliefAdd { }
-    public static class ConceptBeliefRemove { }
+    
+    abstract public static class ConceptBeliefAdd implements EventObserver {  
+        
+        abstract public void onBeliefAdd(Concept c, Task t, Object[] extra);
+        
+        @Override public void event(Class event, Object[] args) {
+            onBeliefAdd( (Concept)args[0], (Task)args[1], (Object[])args[2]);
+        }
+        
+    }
+    
+    abstract public static class ConceptBeliefRemove implements EventObserver { 
+        
+        abstract public void onBeliefRemove(Concept c, Sentence removed, Task t, Object[] extra);
+        
+        @Override public void event(Class event, Object[] args) {
+            onBeliefRemove( (Concept)args[0], (Sentence)args[1], (Task)args[2], (Object[])args[3]);
+        }        
+
+    }
     
     public static class ConceptGoalAdd { }
     public static class ConceptGoalRemove { }
@@ -79,7 +97,7 @@ public class Events {
     public static class TaskLinkAdd { }
     public static class TaskLinkRemove { }
     
-    public static class Solved { }
+    public static class Answer { }
     public static class Unsolved { }
     
     
@@ -115,7 +133,14 @@ public class Events {
     
     public static class ConceptUnification { } //2nd level unification in CompositionalRules
 
-    public static class TaskAdd { }
+    abstract public static class TaskAdd implements EventObserver { 
+        
+        abstract public void onTaskAdd(Task t, String reason);
+        
+        @Override public void event(Class event, Object[] args) {
+            onTaskAdd((Task)args[0], (String)args[1]);
+        }
+    }
     public static class TaskRemove { }
     public static class TaskDerive {    }
 

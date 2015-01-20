@@ -37,6 +37,7 @@ import nars.io.Symbols;
 import nars.io.Texts;
 import nars.language.CompoundTerm;
 import nars.language.Conjunction;
+import nars.language.Interval;
 import nars.language.Statement;
 import nars.language.Term;
 import nars.language.Terms.Termable;
@@ -86,6 +87,11 @@ public class Sentence<T extends Term> implements Cloneable, Termable, Truthable 
 
     private final int hash;
     
+    
+    public Sentence(T term, char punctuation, TruthValue newTruth, Stamp newStamp) {
+        this(term, punctuation, newTruth, newStamp, true);
+    }
+    
     /**
      * Create a Sentence with the given fields
      *
@@ -95,18 +101,19 @@ public class Sentence<T extends Term> implements Cloneable, Termable, Truthable 
      * @param stamp The stamp of the sentence indicating its derivation time and
      * base
      */
-    public Sentence(final T _content, final char punctuation, final TruthValue truth, final Stamp stamp) {
+    private Sentence(final T _content, final char punctuation, final TruthValue truth, final Stamp stamp, boolean normalize) {
         
         this.punctuation = punctuation;
         
-        
-        
-        
-        if (!(_content instanceof CompoundTerm))
-            throw new RuntimeException("Sentence content must be CompoundTerm: " + _content + punctuation + " " + stamp);
+        if (_content instanceof Interval)
+            throw new RuntimeException("Sentence content must not be Interval: " + _content + punctuation + " " + stamp);
         
         if ( (!isQuestion() && !isQuest()) && (truth == null) ) {            
             throw new RuntimeException("Judgment and Goal sentences require non-null truth value");
+        }
+        
+        if(_content.subjectOrPredicateIsIndependentVar()) {
+                throw new RuntimeException("A statement sentence is not allowed to have a independent variable as subj or pred");
         }
         
         if (Parameters.DEBUG && Parameters.DEBUG_INVALID_SENTENCES) {
@@ -130,7 +137,7 @@ public class Sentence<T extends Term> implements Cloneable, Termable, Truthable 
         
         //Variable name normalization
         //TODO move this to Concept method, like cloneNormalized()
-        if (_content.hasVar() && (_content instanceof CompoundTerm) && (!((CompoundTerm)_content).isNormalized() ) ) {
+        if (normalize && _content.hasVar() && (_content instanceof CompoundTerm) && (!((CompoundTerm)_content).isNormalized() ) ) {
             
             this.term = (T)((CompoundTerm)_content).cloneDeepVariables();
             
@@ -195,6 +202,8 @@ public class Sentence<T extends Term> implements Cloneable, Termable, Truthable 
         else 
             this.hash = Objects.hash(term, punctuation, truth );
     }
+
+    
 
     protected boolean isUniqueByOcurrenceTime() {
         return ((punctuation == Symbols.JUDGMENT_MARK) || (punctuation == Symbols.QUESTION_MARK));
@@ -304,7 +313,7 @@ public class Sentence<T extends Term> implements Cloneable, Termable, Truthable 
                 
         Stamp newStamp = eternalizing ? stamp.cloneWithNewOccurrenceTime(Stamp.ETERNAL) : stamp.clone();
         
-        return new Sentence(term, punctuation, newTruth, newStamp);
+        return new Sentence(term, punctuation, newTruth, newStamp, false);
     }
 
     
@@ -457,7 +466,7 @@ public class Sentence<T extends Term> implements Cloneable, Termable, Truthable 
         
         final long t = nar.memory.time();
 
-        final String tenseString = ( (punctuation == Symbols.JUDGMENT_MARK) || (punctuation == Symbols.QUESTION_MARK)) ? stamp.getTense(t, nar.memory.getDuration()) : "";
+        final String tenseString = stamp.getTense(t, nar.memory.getDuration());
         
         
         CharSequence stampString = showStamp ? stamp.name() : null;

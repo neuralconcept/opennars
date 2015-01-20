@@ -20,11 +20,13 @@
  */
 package nars.language;
 
+import com.google.common.collect.Iterators;
 import java.nio.CharBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -40,7 +42,7 @@ import static nars.io.Symbols.NativeOperator.COMPOUND_TERM_OPENER;
 import static nars.language.CompoundTerm.makeCompoundName;
 
 
-public abstract class CompoundTerm extends Term {
+public abstract class CompoundTerm extends Term implements Iterable<Term> {
     
     /**
      * list of (direct) term
@@ -164,7 +166,9 @@ public abstract class CompoundTerm extends Term {
         if (c.getClass()!=getClass())
             throw new UnableToCloneException("cloneDeepVariables resulted in different class: " + c + " from " + this);                
         
-        return (CompoundTerm)c;
+        CompoundTerm cc = (CompoundTerm)c;
+        cc.setNormalized(isNormalized());
+        return cc;
     }
     
     /** override in subclasses to avoid unnecessary reinit */
@@ -381,7 +385,7 @@ public abstract class CompoundTerm extends Term {
     public Term[] cloneTermsExcept(final boolean requireModification, final Term[] toRemove) {
         //TODO if deep, this wastes created clones that are then removed.  correct this inefficiency?
         
-        List<Term> l = getTermList();
+        List<Term> l = asTermList();
         boolean removed = false;
                 
         for (final Term t : toRemove) {
@@ -431,7 +435,7 @@ public abstract class CompoundTerm extends Term {
         
     }
 
-    public List<Term> getTermList() {        
+    public List<Term> asTermList() {        
         ArrayList l = new ArrayList(term.length);
         addTermsTo(l);
         return l;
@@ -586,7 +590,7 @@ public abstract class CompoundTerm extends Term {
      * @return The new compound
      */
     public Term setComponent(final int index, final Term t, final Memory memory) {
-        List<Term> list = getTermList();//Deep();
+        List<Term> list = asTermList();//Deep();
         list.remove(index);
         if (t != null) {
             if (getClass() != t.getClass()) {
@@ -1002,6 +1006,21 @@ public abstract class CompoundTerm extends Term {
     }
 
     
+    public Term[] cloneTermsReplacing(Term from, Term to) {
+        Term[] y = new Term[term.length];
+        int i = 0;
+        for (Term x : term) {
+            if (x.equals(from))
+                x = to;
+            y[i++] = x;
+        }
+        return y;
+    }
 
+    @Override
+    public Iterator<Term> iterator() {
+        return Iterators.forArray(term);
+    }
 
+    
 }

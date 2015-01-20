@@ -31,7 +31,7 @@ public class NALTest  {
         Parameters.DEBUG = true;
     }
 
-    int minCycles = 1550; //TODO reduce this to one or zero
+    int minCycles = 1550; //TODO reduce this to one or zero to avoid wasting any extra time during tests
     static public boolean showOutput = false;
     static public boolean saveSimilar = true;
     static public boolean showSuccess = false;
@@ -189,6 +189,12 @@ public class NALTest  {
 
 
             String example = getExample(path);
+            
+            if (showOutput) {
+                System.out.println(example);
+                System.out.println();
+            }
+            
             List<OutputCondition> extractedExpects = OutputCondition.getConditions(n, example, similarsToSave);
             for (OutputCondition e1 : extractedExpects)
                 expects.add(e1);

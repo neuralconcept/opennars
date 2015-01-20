@@ -100,7 +100,8 @@ public class Implication extends Statement {
             return null;
         }
         
-        if ((subject instanceof Implication) || (subject instanceof Equivalence) || (predicate instanceof Equivalence)) {
+        if ((subject instanceof Implication) || (subject instanceof Equivalence) || (predicate instanceof Equivalence) ||
+                (subject instanceof Interval) || (predicate instanceof Interval)) {
             return null;
         }
         
@@ -138,4 +139,15 @@ public class Implication extends Statement {
     public int getTemporalOrder() {
         return temporalOrder;
     }
+
+    public boolean isForward() {
+        return getTemporalOrder()==TemporalRules.ORDER_FORWARD;
+    }
+    public boolean isBackward() {
+        return getTemporalOrder()==TemporalRules.ORDER_BACKWARD;
+    }
+    public boolean isConcurrent() {
+        return getTemporalOrder()==TemporalRules.ORDER_CONCURRENT;
+    }
+    
 }
